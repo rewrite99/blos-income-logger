@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -23,7 +24,7 @@ using std::chrono::milliseconds;
 
 
 std::string your_name {};
-std::string path {};
+std::filesystem::path path {};
 double total_income {};
 double last_income {};
 long long last_pos {};
@@ -223,9 +224,9 @@ void consoleSetup(){
 int main(){
     consoleSetup();
     SetConsoleTitleA("(=ↀᆺↀ=)");
-    your_name = "~ ✦ My Timer ✦ ~";
-
     std::cout << "\033[2J\033[3J\033[H";
+
+    your_name = "~ ✦ Your Timer ✦ ~";
     path = "D:/MultiMC/instances/1.21.1/.minecraft/logs/latest.log";
 
     Timer t {TimerMode::Stopwatch};
