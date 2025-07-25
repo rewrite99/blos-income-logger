@@ -34,7 +34,13 @@ namespace Log{
 
     class Timer{
     public:
-        Timer (Mode m) : mode(m) {}
+        Timer (Mode m, int64_t sec = 0) : mode(m) {
+            int64_t ms = sec * 1000;
+            setTimer(ms);
+            if (mode == Mode::Countdown){
+                toggle();
+            }
+        }
 
         void toggle(){
             auto now {Clock::now()};
@@ -46,6 +52,22 @@ namespace Log{
         void reset(){
             is_running = false;
             start = end = {};
+        }
+
+        void setTimer(int64_t ms){
+            is_running = false;
+            auto now {Clock::now()};
+
+            switch (mode){
+                case Mode::Stopwatch:
+                    end = start + milliseconds(ms);
+                    break;
+                case Mode::Countdown:
+                    start = end = now;
+                    remaining_ms = ms;
+                    break;
+                default: break;
+            }
         }
 
         std::string timeFormat(int64_t ms){
@@ -60,8 +82,12 @@ namespace Log{
             return std::string(buf);
         }
 
-        std::string getSeconds(int64_t ms) const{
-            return std::to_string(ms / 1000);
+        std::string getCdSeconds(int64_t ms){
+            if (ms <= 0 && mode == Mode::Countdown){
+                start = end = Clock::now();
+                is_running = true;
+            }
+            return std::to_string(ms / 1000) + 's';
         }
 
         int64_t getTimeMs(){        
@@ -99,10 +125,11 @@ namespace Log{
         Mode mode {};
         TimePoint start {};
         TimePoint end {};
-        bool is_running {false};
-        int64_t time_ms {};
+        bool is_running {false};        
         int64_t remaining_ms {};
     };
+
+    Timer t {Log::Mode::Stopwatch};
 
     std::string toComma(double num){
         std::ostringstream oss {};
@@ -139,7 +166,7 @@ namespace Log{
         return new_lines;
     }
 
-    double extractAmount(Timer& t, const std::string& msg){  
+    double extractAmount(const std::string& msg){  
         if (t.getIsRunning() == false) return {}; 
         size_t target_pos {msg.find(TARGET)};
         if (target_pos == std::string::npos) return {};
@@ -153,15 +180,15 @@ namespace Log{
         }
     }
 
-    double ratePerHr(Timer& t){
+    double ratePerHr(){
         int64_t elapsed_sec {t.getTimeMs() / 1000};
         if (elapsed_sec == 0) return {};
         return {(total_income / static_cast<double>(elapsed_sec)) * 3600};
     }
 
-    void update(Timer& t){
+    void update(){
         for (const auto& line : monitorLog()){
-            double income {extractAmount(t, line)};
+            double income {extractAmount(line)};
             if (income > 0){
                 last_income = income;
                 total_income += income;
@@ -169,7 +196,7 @@ namespace Log{
         }
     }
 
-    void hInput(Timer& t){
+    void hInput(){
         if (_kbhit()){
             int key {std::tolower(static_cast<unsigned char>(_getch()))};
             switch (key){
@@ -181,34 +208,32 @@ namespace Log{
         }
     }
 
-    void draw(Timer& t){
+    void draw(){
         char buf [256];
         constexpr const char* DRAW {
-            "\033[?25l\033[0J\033[H\033[33m"
-            "%s\n\033[36m"
-            "Timer\t\033[32m%11s\033[36m\n"
-            "Gained\t\033[32m%11s\033[36m\n"
-            "Total\t\033[32m%11s\033[36m\n"
-            "\033[32m%16s/hr"
+            "\033[?25l\033[0J\033[H"
+            "│\033[33m%-19s\033[36m│\n"
+            "│Timer\t\033[32m%12s\033[36m│\n"
+            "│Gained\t\033[32m%12s\033[36m│\n"
+            "│Total\t\033[32m%12s\033[36m│\n"
+            "│\033[32m%16s/hr\033[36m│\n"
         };
 
         while (true){
-            update(t);
-            hInput(t);
+            update();
+            hInput();
             std::snprintf(buf, sizeof(buf), DRAW,
             your_name.c_str(),
             t.timeFormat(t.getTimeMs()).c_str(),
             toComma(last_income).c_str(),
             toComma(total_income).c_str(),
-            toComma(ratePerHr(t)).c_str());
+            toComma(ratePerHr()).c_str());
             std::cout << buf << std::flush;
 
             std::this_thread::sleep_for(std::chrono::milliseconds(33));
         }
     }
 }
-
-
 
 void consoleSetup(){
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -235,8 +260,7 @@ int main(){
     Log::your_name = "~ Your Timer ~";
     Log::filepath = "D:/MultiMC/instances/1.21.1/.minecraft/logs/latest.log";
 
-    Log::Timer t {Log::Mode::Stopwatch};
-    draw(t);
+    Log::draw();
 
     return 0;
 }
